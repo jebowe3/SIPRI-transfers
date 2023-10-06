@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang='en'>
+
+<head>
+    <title>US Global Weapons Transfers</title>
+    <meta charset="utf-8">
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #my_dataviz {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+
+</head>
+
+<body>
+    <!-- Create an element where the map will take place that is the size of the page -->
+    <svg id="my_dataviz"></svg>
+    <!-- Load d3.js -->
+    <script src="https://d3js.org/d3.v7.js"></script>
+    <script src="https://unpkg.com/topojson@3"></script>
+
+    <!-- Custom JavaScript here -->
+    <script>
+        
+        // Define universal variables
+        const svg = d3.select("svg"); // Select the SVG element
+        const width = window.innerWidth; // Get viewport width
+        const height = window.innerHeight; // Get viewport height
+        const projection = d3.geoNaturalEarth1() // Create a geoNaturalEarth1 projection
+                .scale(width / 1.7 / Math.PI) // Scale the map
+                .translate([width / 2, height / 2]); //  Center the map in the middle of the screen
+
+        // Function to resize the SVG based on viewport size
+        function resize() {
+
+            // Update SVG width and height attributes
+            svg.attr("width", width) // Set SVG width
+               .attr("height", height); // Set SVG height
+
+            // Update the map paths
+            svg.selectAll("path") // Select paths
+                .attr("d", d3.geoPath() // Set path's d attribute
+                    .projection(projection) // Set projection
+                );
+        };
+
+        // Function to handle zooming
+        function handleZoom(e) {
+            
+            const transform = e.transform; // Get current zoom level
+
+            // Update the map paths
+            svg.selectAll("path")
+                .attr("transform", transform); // Apply transform to paths
+
+        };
+        
+        // Create a zoom object
+        let zoom = d3.zoom()
+            .scaleExtent([1, 8]) // Set min and max zoom levels
+            .on("zoom", handleZoom); // Call handleZoom() when zoom event triggered
+        
+        // Add zoom functionality to the SVG
+        d3.select("svg").call(zoom);
+
+        // Prevent panning beyond the viewport
+        zoom.translateExtent([[0, 0], [window.innerWidth, window.innerHeight]]);
+        
+        // Initial resizing and event listener for viewport changes
+        resize();
+        window.addEventListener("resize", resize);
+
+        // Load external data and draw the map
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function (data) {
+            
+            // Draw the map
+            svg.append("g")
+                .selectAll("path") // Select paths
+                .data(data.features) // Add data
+                .enter().append("path") // Add paths
+                .attr("fill", "#69b3a2") // Set fill color
+                .attr("d", d3.geoPath() // Set path's d attribute
+                    .projection(projection) // Set projection
+                )
+                .style("stroke", "#fff"); // Set stroke color
+        });
+    </script>
+</body>
+
+</html>
+
