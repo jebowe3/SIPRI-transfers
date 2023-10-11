@@ -1,98 +1,226 @@
-<!DOCTYPE html>
-<html lang='en'>
+<!doctype html>
+<html>
 
 <head>
-    <title>US Global Weapons Transfers</title>
-    <meta charset="utf-8">
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-        }
+  <meta charset="utf-8">
+  <title>US Global Weapons Transfers</title>
+  <!--<link rel="stylesheet" href="https://unpkg.com/leaflet@0.6.2/dist/leaflet.css" />-->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""/>
+  <!--<link href='https://api.mapbox.com/mapbox-assembly/v0.8.0/assembly.min.css' rel='stylesheet'>-->
+  <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
 
-        #my_dataviz {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-    </style>
+  <style type="text/css">
+    body {
+      margin: 0px;
+      height: 100%;
+      width: 100%;
+      background: #FFFFF0;
+    }
 
+    #map {
+      position: fixed;
+      top: 0px;
+      bottom: 0px;
+      width: 100%;
+      background: #030511;
+      border-left: 1px solid gray;
+    }
+
+    #main-map {
+      background-color: #008CBA;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 12px;
+      margin: 5px;
+      position: absolute;
+      top: 45px;
+      right: 10px;
+    }
+
+    #main-map:hover {
+      background-color: #72bcd4;
+    }
+
+    /* Set time slider styles */
+    #slider {
+      position: absolute;
+      height: 30px;
+      bottom: 10px;
+      left: 70px;
+      z-index: 800;
+      background-color: rgba(255, 255, 255, 0.85);
+      border-radius: 3px;
+      box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Set temporal legend styles */
+    #temporal {
+      height: 30px;
+      width: 56px;
+      background-color: rgba(255, 255, 255, 0.85);
+      border-radius: 3px;
+      box-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.2);
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 800;
+    }
+
+    /* Set the styles for the text span in the temporal legend */
+    #temporal span {
+      font-family: 'Lato', sans-serif;
+      font-weight: 300;
+      font-style: italic;
+      position: inherit;
+      font-size: 20px;
+      color: rgba(0, 0, 0, 1.0);
+      top: 1px;
+      left: 4px;
+    }
+  </style>
 </head>
 
 <body>
-    <!-- Create an element where the map will take place that is the size of the page -->
-    <svg id="my_dataviz"></svg>
-    <!-- Load d3.js -->
-    <script src="https://d3js.org/d3.v7.js"></script>
+  <div id="map"></div>
+  <!-- ui slider -->
+  <div id="slider" class="leaflet-control">
+    <!-- Use the first and last year of the time data as the min and max. Set the initial value as the first year. Set the steps at one year. -->
+    <input type="range" min="1950" max="2022" value="1950" step="1" class="slider" />
+  </div>
+  <!-- temporal legend -->
+  <div id='temporal'>
+    <span></span>
+  </div>
 
-    <!-- Custom JavaScript here -->
-    <script>
-        
-        // Define universal variables
-        const svg = d3.select("svg"); // Select the SVG element
-        const width = window.innerWidth; // Get viewport width
-        const height = window.innerHeight; // Get viewport height
-        const projection = d3.geoNaturalEarth1() // Create a geoNaturalEarth1 projection
-                .scale(width / 1.7 / Math.PI) // Scale the map
-                .translate([width / 2, height / 2]); //  Center the map in the middle of the screen
+  <!--<script src="https://unpkg.com/leaflet@0.6.2/dist/leaflet.js"></script>-->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""></script>
+  <script type="text/javascript" src="js/proj4js-compressed.js"></script>
+  <script type="text/javascript" src="js/proj4leaflet.js"></script>
+  <script type="text/javascript" src="js/L.Graticule.js"></script>
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+  <script src="https://d3js.org/d3.v4.min.js"></script>
 
-        // Function to resize the SVG based on viewport size
-        function resize() {
+  <script type="text/javascript">
+    // Sphere Mollweide: http://spatialreference.org/ref/esri/53009/
+    const crs = new L.Proj.CRS('ESRI:53009', '+proj=moll +lon_0=0 +x_0=0 +y_0=0 +a=6371000 +b=6371000 +units=m +no_defs', {
+      resolutions: [65536, 32768, 16384, 8192, 4096, 2048]
+    });
 
-            // Update SVG width and height attributes
-            svg.attr("width", width) // Set SVG width
-               .attr("height", height); // Set SVG height
+    const map = L.map('map', {
+      crs: crs,
+      maxZoom: 5,
+      minZoom: 1,
+      zoomAnimation: false
+    });
 
-            // Update the map paths
-            svg.selectAll("path") // Select paths
-                .attr("d", d3.geoPath() // Set path's d attribute
-                    .projection(projection) // Set projection
-                );
-        };
+    L.graticule({
+      sphere: true,
+      style: {
+        color: '#777',
+        opacity: 1,
+        fillColor: '#050a30',
+        fillOpacity: 1,
+        weight: 0.5
+      }
+    }).addTo(map);
 
-        // Function to handle zooming
-        function handleZoom(e) {
-            
-            const transform = e.transform; // Get current zoom level
+    L.graticule({
+      style: {
+        color: '#777',
+        weight: 1,
+        opacity: 0.5
+      }
+    }).addTo(map);
 
-            // Update the map paths
-            svg.selectAll("path")
-                .attr("transform", transform); // Apply transform to paths
+    // Fit the map to the world
+    map.fitWorld();
 
-        };
-        
-        // Create a zoom object
-        let zoom = d3.zoom()
-            .scaleExtent([1, 8]) // Set min and max zoom levels
-            .on("zoom", handleZoom); // Call handleZoom() when zoom event triggered
-        
-        // Add zoom functionality to the SVG
-        d3.select("svg").call(zoom);
+    // Create a feature group to store polygons
+    const filteredCountries = L.featureGroup().addTo(map);
 
-        // Prevent panning beyond the viewport
-        zoom.translateExtent([[0, 0], [window.innerWidth, window.innerHeight]]);
-        
-        // Initial resizing and event listener for viewport changes
-        resize();
-        window.addEventListener("resize", resize);
+    // load the data asynchronously
+    d3.queue()
+      .defer(d3.json, 'data/clipped-world-land.geojson') // the continents, land masses
+      .defer(d3.json, 'data/world-historic-sipri-tiv.geojson') // the historical countries layer
+      .await(drawMap); // load the layers after the map loads
 
-        // Load external data and draw the map
-        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function (data) {
-            
-            // Draw the map
-            svg.append("g")
-                .selectAll("path") // Select paths
-                .data(data.features) // Add data
-                .enter().append("path") // Add paths
-                .attr("fill", "#69b3a2") // Set fill color
-                .attr("d", d3.geoPath() // Set path's d attribute
-                    .projection(projection) // Set projection
-                )
-                .style("stroke", "#fff"); // Set stroke color
-        });
-    </script>
-</body>
+    // define drawMap function
+    function drawMap(err, land, countries) {
 
-</html>
+      // define the value in the slider when the map loads
+      let currentYear = $('.slider').val();
 
+      // convert the year to a number
+      currentYear = Number(currentYear);
+      console.log(currentYear);
+
+      const earth = L.geoJson(land, {
+        style: function(feature) {
+          return {
+            stroke: 1,
+            color: 'grey',
+            strokeOpacity: 1,
+            weight: 1,
+            fillColor: 'black',
+            fillOpacity: 1
+          }
+        }
+      }).addTo(map); // keeps the earth layer from being placed over the circle markers upon map load
+
+      const nations = L.geoJson(countries, {
+        style: function(feature) {
+          return {
+            stroke: 1,
+            color: 'grey',
+            strokeOpacity: 1,
+            weight: 1,
+            fillColor: 'black',
+            fillOpacity: 1,
+          }
+        },
+        onEachFeature: function(feature, layer) {
+          layer.bindTooltip(layer.feature.properties.cntry_name, {
+            sticky: true,
+            direction: 'auto'
+          });
+          // restyle the stroke color to yellow when the mouse hovers over a country
+          layer.on('mouseover', function(e) {
+            layer.setStyle({
+              fillColor: 'yellow'
+            });
+          });  
+          // restyle the stroke color to grey when the mouse leaves a country
+          layer.on('mouseout', function(e) {
+            layer.setStyle({
+              fillColor: 'black'
+            });
+          }); 
+          // filter features
+          if (layer.feature.properties.gwsyear == currentYear) {
+            console.log(layer.feature.properties.gwsyear);
+            filteredCountries.addLayer(layer);
+          } else {
+            filteredCountries.removeLayer(layer);
+          }
+        }
+      }); // keeps nations layer from being placed over circle markers upon map load
+
+    };
+
+    console.log(filteredCountries);
+
+    // Add a temporal legend in sync with the UI slider
+    function createTemporalLegend(currentYear) { // feed it the selected year
+
+      $('#temporal span').html(currentYear); // change grade value to that currently selected by UI slider
+
+    }; // End createTemporalLegend function
+  </script>
