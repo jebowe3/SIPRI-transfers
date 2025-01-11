@@ -4,13 +4,8 @@
 <head>
   <meta charset="utf-8">
   <title>US Global Weapons Transfers</title>
-  <!--<link rel="stylesheet" href="https://unpkg.com/leaflet@0.6.2/dist/leaflet.css" />-->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-  crossorigin=""/>
-  <!--<link href='https://api.mapbox.com/mapbox-assembly/v0.8.0/assembly.min.css' rel='stylesheet'>-->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
-
   <style type="text/css">
     body {
       margin: 0px;
@@ -90,23 +85,20 @@
   <div id="map"></div>
   <!-- ui slider -->
   <div id="slider" class="leaflet-control">
-    <!-- Use the first and last year of the time data as the min and max. Set the initial value as the first year. Set the steps at one year. -->
-    <input type="range" min="1950" max="2022" value="1950" step="1" class="slider" />
+    <input type="range" min="1950" max="2023" value="1950" step="1" class="slider" />
   </div>
   <!-- temporal legend -->
   <div id='temporal'>
     <span></span>
   </div>
 
-  <!--<script src="https://unpkg.com/leaflet@0.6.2/dist/leaflet.js"></script>-->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-  crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="text/javascript" src="js/proj4js-compressed.js"></script>
   <script type="text/javascript" src="js/proj4leaflet.js"></script>
   <script type="text/javascript" src="js/L.Graticule.js"></script>
   <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
   <script src="https://d3js.org/d3.v4.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>
 
   <script type="text/javascript">
     // Sphere Mollweide: http://spatialreference.org/ref/esri/53009/
@@ -140,28 +132,20 @@
       }
     }).addTo(map);
 
-    // Fit the map to the world
-    map.fitWorld();
-
     // Create a feature group to store polygons
-    const filteredCountries = L.featureGroup().addTo(map);
+    const filteredCountries = L.featureGroup();
 
-    // load the data asynchronously
+    // Load the data and initialize the map
     d3.queue()
       .defer(d3.json, 'data/clipped-world-land.geojson') // the continents, land masses
-      .defer(d3.json, 'data/world-historic-sipri-tiv.geojson') // the historical countries layer
+      .defer(d3.json, 'data/sipri-perc.geojson') // the historical countries layer
       .await(drawMap); // load the layers after the map loads
 
-    // define drawMap function
     function drawMap(err, land, countries) {
+      // Reset the slider to the initial year
+      $('.slider').val(1950);
 
-      // define the value in the slider when the map loads
-      let currentYear = $('.slider').val();
-
-      // convert the year to a number
-      currentYear = Number(currentYear);
-      console.log(currentYear);
-
+      // Create the earth layer (background layer for land masses)
       const earth = L.geoJson(land, {
         style: function(feature) {
           return {
@@ -171,56 +155,140 @@
             weight: 1,
             fillColor: 'black',
             fillOpacity: 1
-          }
+          };
         }
-      }).addTo(map); // keeps the earth layer from being placed over the circle markers upon map load
+      }).addTo(map); // Keeps the earth layer from being placed over the circle markers upon map load
 
-      const nations = L.geoJson(countries, {
+      // Create the nations layer but don't add it directly to the map
+      nations = L.geoJson(countries, {
         style: function(feature) {
           return {
-            stroke: 1,
+            stroke: 0.5,
             color: 'grey',
-            strokeOpacity: 1,
-            weight: 1,
-            fillColor: 'black',
-            fillOpacity: 1,
-          }
-        },
-        onEachFeature: function(feature, layer) {
-          layer.bindTooltip(layer.feature.properties.cntry_name, {
-            sticky: true,
-            direction: 'auto'
-          });
-          // restyle the stroke color to yellow when the mouse hovers over a country
-          layer.on('mouseover', function(e) {
-            layer.setStyle({
-              fillColor: 'yellow'
-            });
-          });  
-          // restyle the stroke color to grey when the mouse leaves a country
-          layer.on('mouseout', function(e) {
-            layer.setStyle({
-              fillColor: 'black'
-            });
-          }); 
-          // filter features
-          if (layer.feature.properties.gwsyear == currentYear) {
-            console.log(layer.feature.properties.gwsyear);
-            filteredCountries.addLayer(layer);
-          } else {
-            filteredCountries.removeLayer(layer);
-          }
+            strokeOpacity: 0.0,
+            weight: 0.5,
+            fillOpacity: 0.5
+          };
         }
-      }); // keeps nations layer from being placed over circle markers upon map load
+      });
 
+      // Initialize the map with the first year value (1950)
+      updateMapForYear(1950); // Apply the filter immediately to the initial year (1950)
+      createTemporalLegend(1950); // Initialize the temporal legend with 1950
+
+      // Add the filtered countries to the map (filtered by 1950)
+      map.addLayer(filteredCountries);
+
+      // Fit the map to the world
+      map.fitWorld();
     };
 
-    console.log(filteredCountries);
+    // Function to update the map for the selected year
+    function updateMapForYear(year) {
+      filteredCountries.clearLayers(); // Clear existing layers
+
+      nations.eachLayer(function(layer) {
+        // Define the properties
+        const props = layer.feature.properties; // derive the properties of the target layer
+
+        // Dynamically set styles for all nations based on percentage of US weapons
+        // received in the slider designated year using the getColor function
+        layer.setStyle({fillColor: getColor(props[year])});
+
+        // Create an empty array
+        const TIValues = [];
+
+        // On hover, highlight the nation with a yellow border
+        layer.on('mouseover', function() {
+          // Clear the TIValues array
+          TIValues.length = 0;
+
+          // Set the mouseover style
+          this.setStyle({
+            weight: 2,
+            color: 'yellow',
+            fillOpacity: 0.7
+          });
+
+          // Bring the nation to the front
+          this.bringToFront();
+
+          // Remove any existing tooltip to avoid duplications
+          this.unbindTooltip();
+
+          // Add a tooltip with the nation's name and the sparkline placeholder
+          this.bindTooltip(
+            props.cntry_name + ' (' + year + ')<br>' + 
+            props[year] + '% of US Weapons Exported<br>' +
+            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>",
+          {
+            sticky: true
+          }).openTooltip();
+
+          // Loop through a specific feature's properties and push values to the TIValues array
+          for (let i = 1950; i <= 2023; i += 1) {
+            TIValues.push(props[i]);
+          }
+
+          // Create sparklines with jQuery and .sparkline() method
+          $('.weaponspark').sparkline(TIValues, {
+            width: '160px',
+            height: '30px',
+            lineColor: '#67271d',
+            fillColor: '#67271d',
+            spotRadius: 0,
+            lineWidth: 2,
+            normalRangeMin: 0
+          });
+        });
+
+        // On mouseout, reset the style
+        layer.on('mouseout', function() {
+          this.setStyle({
+            weight: 0.5,
+            color: 'grey',
+            fillOpacity: 0.5
+          });
+
+          // Unbind the tooltip on mouseout to remove it
+          this.unbindTooltip();
+        });
+
+        const startYear = props.gwsyear;
+        const endYear = props.gweyear;
+
+        // Check the year range and add countries to the filtered layer
+        if (startYear <= year && endYear >= year) {
+          filteredCountries.addLayer(layer);
+        }
+      });
+    };
+
+    // Function to handle slider input changes
+    $('.slider').on('input', function() {
+      const currentYear = Number($(this).val()); // Get the current year from the slider
+      updateMapForYear(currentYear); // Call the function to update the map based on the selected year
+      createTemporalLegend(currentYear); // Update the temporal legend to match the slider year
+    });
 
     // Add a temporal legend in sync with the UI slider
-    function createTemporalLegend(currentYear) { // feed it the selected year
+    function createTemporalLegend(currentYear) {
+      $('#temporal span').html(currentYear); // Change grade value to that currently selected by UI slider
+    };
 
-      $('#temporal span').html(currentYear); // change grade value to that currently selected by UI slider
-
-    }; // End createTemporalLegend function
+    // Add a function to style the nations by their percentage share of weapons
+    function getColor(d) {
+      return d > 8.13 ? '#b10026' :
+           d > 4.65  ? '#e31a1c' :
+           d > 3.36  ? '#fc4e2a' :
+           d > 2.23  ? '#fd8d3c' :
+           d > 1.16   ? '#feb24c' :
+           d > 0.54   ? '#fed976' :
+           d > 0.15   ? '#ffeda0' :
+           d > 0.009   ? '#ffffcc' :
+                      '#000000';
+    };    
   </script>
+</body>
+
+</html>
