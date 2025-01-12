@@ -133,15 +133,25 @@
     }).addTo(map);
 
     // Create a feature group to store polygons
-    const filteredCountries = L.featureGroup();
+    const filteredPercent = L.featureGroup();
+
+    // Create a feature group to store points
+    const filteredVolume = L.featureGroup();
+
+    // Declare a global variable to store the percent layer
+    let percent;
+
+    // Declare a global variable to store the volume layer
+    let volume;
 
     // Load the data and initialize the map
     d3.queue()
       .defer(d3.json, 'data/clipped-world-land.geojson') // the continents, land masses
-      .defer(d3.json, 'data/sipri-perc.geojson') // the historical countries layer
+      .defer(d3.json, 'data/sipri-perc.geojson') // the percentage layer
+      .defer(d3.json, 'data/sipri-vol.geojson') // the volume layer
       .await(drawMap); // load the layers after the map loads
 
-    function drawMap(err, land, countries) {
+    function drawMap(err, land, perc, vol) {
       // Reset the slider to the initial year
       $('.slider').val(1950);
 
@@ -159,8 +169,8 @@
         }
       }).addTo(map); // Keeps the earth layer from being placed over the circle markers upon map load
 
-      // Create the nations layer but don't add it directly to the map
-      nations = L.geoJson(countries, {
+      // Create the percent layer but don't add it directly to the map
+      percent = L.geoJson(perc, {
         style: function(feature) {
           return {
             stroke: 0.5,
@@ -172,28 +182,61 @@
         }
       });
 
-      // Initialize the map with the first year value (1950)
+      // Create the volume point layer but don't add it directly to the map
+      volume = L.geoJson(vol, {
+        pointToLayer: function(feature, latlng) {
+          return L.circleMarker(latlng, {
+            //radius: 5,
+            fillColor: 'orange',
+            color: 'orange',
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.25
+          });
+        }
+      });
+
+      // Now that all layers are loaded, initialize the map with the first year value (1950)
       updateMapForYear(1950); // Apply the filter immediately to the initial year (1950)
       createTemporalLegend(1950); // Initialize the temporal legend with 1950
 
-      // Add the filtered countries to the map (filtered by 1950)
-      map.addLayer(filteredCountries);
+      // Add the filtered layers to the map (filtered by 1950)
+      map.addLayer(filteredPercent);
+      map.addLayer(filteredVolume);
 
       // Fit the map to the world
       map.fitWorld();
+
+      // Define the overlays
+      const overlays = {
+        "Total Volume of Weapons": filteredVolume,
+        "Percentage of Weapons": filteredPercent
+      };
+
+      // all done with the layers, add them to layer control
+      L.control.layers(null, overlays, {
+        collapsed: false,
+      }).addTo(map);
+      
     };
 
     // Function to update the map for the selected year
     function updateMapForYear(year) {
-      filteredCountries.clearLayers(); // Clear existing layers
+      
+      // Clear existing layers
+      filteredPercent.clearLayers();
+      filteredVolume.clearLayers();
 
-      nations.eachLayer(function(layer) {
+      // Loop through each layer in the percent layer
+      percent.eachLayer(function(layer) {
         // Define the properties
         const props = layer.feature.properties; // derive the properties of the target layer
 
         // Dynamically set styles for all nations based on percentage of US weapons
         // received in the slider designated year using the getColor function
-        layer.setStyle({fillColor: getColor(props[year])});
+        layer.setStyle({
+          fillColor: getColor(props[year])
+        });
 
         // Create an empty array
         const TIValues = [];
@@ -210,20 +253,16 @@
             fillOpacity: 0.7
           });
 
-          // Bring the nation to the front
-          this.bringToFront();
-
           // Remove any existing tooltip to avoid duplications
           this.unbindTooltip();
 
           // Add a tooltip with the nation's name and the sparkline placeholder
           this.bindTooltip(
-            props.cntry_name + ' (' + year + ')<br>' + 
+            props.cntry_name + ' (' + year + ')<br>' +
             props[year] + '% of US Weapons Exported<br>' +
-            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>",
-          {
-            sticky: true
-          }).openTooltip();
+            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
+              sticky: true
+            }).openTooltip();
 
           // Loop through a specific feature's properties and push values to the TIValues array
           for (let i = 1950; i <= 2023; i += 1) {
@@ -232,8 +271,8 @@
 
           // Create sparklines with jQuery and .sparkline() method
           $('.weaponspark').sparkline(TIValues, {
-            width: '160px',
-            height: '30px',
+            width: '180px',
+            height: '40px',
             lineColor: '#67271d',
             fillColor: '#67271d',
             spotRadius: 0,
@@ -259,9 +298,84 @@
 
         // Check the year range and add countries to the filtered layer
         if (startYear <= year && endYear >= year) {
-          filteredCountries.addLayer(layer);
-        }
+          filteredPercent.addLayer(layer);
+        };
       });
+      
+      // Loop through each layer in the volume layer
+      volume.eachLayer(function(layer) {
+        
+        // Define the properties
+        const props = layer.feature.properties;
+
+        // Dynamically set the radius of the circle markers based on the volume of weapons transferred
+        const radius = calcRadius(Number(props[year]));
+        layer.setRadius(radius);
+        
+        const startYear = props.gwsyear;
+        const endYear = props.gweyear;
+
+        // Check the year range and add countries to the filtered layer
+        if (startYear <= year && endYear >= year) {
+          if (props[year] > 0) {
+            filteredVolume.addLayer(layer);
+          }
+        };
+
+        // Create an empty array
+        const TIValues = [];
+
+        // On hover, highlight the circle by increasing the opacity
+        layer.on('mouseover', function() {
+          
+          // Clear the TIValues array
+          TIValues.length = 0;
+
+          // Set the mouseover style
+          this.setStyle({
+            fillOpacity: 0.7
+          });
+
+          // Remove any existing tooltip to avoid duplications
+          this.unbindTooltip();
+
+          // Add a tooltip with the nation's name and the sparkline placeholder
+          this.bindTooltip(
+            props.cntry_name + ' (' + year + ')<br>' +
+            'TIV Volume: ' + props[year] + '<br>' +
+            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
+              sticky: true
+          }).openTooltip();  
+          
+          // Loop through a specific feature's properties and push values to the TIValues array
+          for (let i = 1950; i <= 2023; i += 1) {
+            TIValues.push(props[i]);
+          };
+          
+          // Create sparklines with jQuery and .sparkline() method
+          $('.weaponspark').sparkline(TIValues, {
+            width: '180px',
+            height: '40px',
+            lineColor: '#67271d',
+            fillColor: '#67271d',
+            spotRadius: 0,
+            lineWidth: 2,
+            normalRangeMin: 0
+          });          
+
+        });
+
+        // On mouseout, reset the style
+        layer.on('mouseout', function() {
+          this.setStyle({
+            fillOpacity: 0.25
+          });
+          // Unbind the tooltip on mouseout to remove it
+          this.unbindTooltip();          
+        });
+
+      });
+
     };
 
     // Function to handle slider input changes
@@ -279,15 +393,21 @@
     // Add a function to style the nations by their percentage share of weapons
     function getColor(d) {
       return d > 8.13 ? '#b10026' :
-           d > 4.65  ? '#e31a1c' :
-           d > 3.36  ? '#fc4e2a' :
-           d > 2.23  ? '#fd8d3c' :
-           d > 1.16   ? '#feb24c' :
-           d > 0.54   ? '#fed976' :
-           d > 0.15   ? '#ffeda0' :
-           d > 0.009   ? '#ffffcc' :
-                      '#000000';
-    };    
+        d > 4.65 ? '#e31a1c' :
+        d > 3.36 ? '#fc4e2a' :
+        d > 2.23 ? '#fd8d3c' :
+        d > 1.16 ? '#feb24c' :
+        d > 0.54 ? '#fed976' :
+        d > 0.15 ? '#ffeda0' :
+        d > 0.009 ? '#ffffcc' :
+        '#000000';
+    };
+
+    // Calculate circle radii
+    function calcRadius(val) {
+      var radius = Math.sqrt(val / Math.PI);
+      return radius * 2; // Adjust 2 as a scale factor
+    }; // End calcRadius() function    
   </script>
 </body>
 
