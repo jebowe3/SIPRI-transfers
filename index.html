@@ -5,8 +5,19 @@
   <meta charset="utf-8">
   <title>US Global Weapons Transfers</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link href='https://api.mapbox.com/mapbox-assembly/v0.8.0/assembly.min.css' rel='stylesheet'>
   <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
   <style type="text/css">
+    h1 {
+      color: #67271d;
+      font-size: 2em;
+    }
+
+    h2 {
+      color: #67271d;
+      font-size: 1.5em;
+    }
+
     body {
       margin: 0px;
       height: 100%;
@@ -16,9 +27,10 @@
 
     #map {
       position: fixed;
+      left: 25%;
       top: 0px;
       bottom: 0px;
-      width: 100%;
+      width: 75%;
       background: #030511;
       border-left: 1px solid gray;
     }
@@ -78,19 +90,179 @@
       top: 1px;
       left: 4px;
     }
+
+    /* Set the styles for the scrollable div */
+    #scroll {
+      position: fixed;
+      left: 0px;
+      top: 0px;
+      bottom: 0px;
+      width: 25%;
+      background-image: url(images/fresh_snow.png);
+      /* add subtle pattern to background from (https://www.toptal.com/designers/subtlepatterns/fresh-snow/) */
+      border-right: 1px solid gray;
+      overflow-y: scroll;
+      box-sizing: border-box;
+      /* Prevent the element from expanding */
+      padding: 20px;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 14px;
+    }
+
+    /* Map legend container */
+    .legend {
+      background-color: #fff;
+      border-radius: 3px;
+      bottom: 30px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
+      font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      padding: 10px;
+      position: absolute;
+      right: 12px;
+      z-index: 1;
+    }
+
+    .legend h4 {
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+
+    .legend div span {
+      border-radius: 50%;
+      display: inline-block;
+      height: 10px;
+      margin-right: 5px;
+      width: 10px;
+    }
+
+    .Circle-TIV {
+      color: #67271d;
+    }
+
+    .Perc-3 {
+      color: #67271d;
+    }
+
+    .legend-large,
+    .legend-small {
+      border-radius: 50%;
+    }
+
+    hr.small,
+    hr.large {
+      width: 80px;
+      position: absolute;
+      top: -9px;
+      left: 75px;
+      border: 0.5px solid #ccc;
+      /* overwrite assembly.css rule */
+      margin-top: 8px;
+      /* overwrite assembly.css rule */
+    }
+
+    #button {
+      position: absolute;
+      font: 12px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+      color: black;
+      background-color: white;
+      padding: 5px;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      outline: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      alignment-baseline: central;
+      right: 12px;
+      top: 74px;
+      /*
+         top:7%;
+         width:7%;
+         left:92%;
+         */
+      text-align: center;
+      text-decoration: none;
+      margin: 0px auto;
+    }
+
+
+    #button:hover {
+      background-color: #d4ebf2;
+    }
   </style>
 </head>
 
 <body>
-  <div id="map"></div>
-  <!-- ui slider -->
-  <div id="slider" class="leaflet-control">
-    <input type="range" min="1950" max="2023" value="1950" step="1" class="slider" />
+  <div id="map">
+    <!-- ui slider -->
+    <div id="slider" class="leaflet-control">
+      <input type="range" min="1950" max="2023" value="1950" step="1" class="slider" />
+    </div>
+    <!-- temporal legend -->
+    <div id='temporal'>
+      <span></span>
+    </div>
   </div>
-  <!-- temporal legend -->
-  <div id='temporal'>
-    <span></span>
+
+  <!-- legend on/off button -->
+  <div id="button" class="leaflet-top" style="pointer-events: auto">
+    <button type="button" onclick="toggleLegend();">Toggle Legend</button>
   </div>
+  <!-- end legend on/off button -->
+
+  <div id='scroll'>
+    <h1 style="padding-bottom: 0.5em;">Destinations of US Weaponry: 2008-2018</h1>
+    <p style="padding-bottom: 0.5em;">This map uses data downloaded from the Stockholm International Peace Research Institute's (SIPRI) Arms Transfers Database of Trend Indicator Values (TIV). These values are based on the known unit production costs of a core set of weapons and are intended
+      to allow for a common measurement of arms flow trends between nations over time. This map plots trends in arms transfers from the US to other nations between 2008 and 2018.</p>
+    <h2 style="padding-bottom: 0.5em;">How to use this map:</h2>
+    <p style="padding-bottom: 0.5em;">Below is an explanation of the map, included data, and its functionality:</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">Find the slider in the bottom-left corner. Click and drag it. For each year selected, the colors of nations change to represent each nation's percent share of the total volume of US weaponry transferred globally during that year. The circle sizes change to reflect the total volume of weaponry each nation received in each year. This value is expressed in trend indicator values (TIV) in millions and the methodology for determining this number can be found on <a class='link' href='https://www.sipri.org/databases/armstransfers/sources-and-methods#TIV-tables'>SIPRI's website</a>.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">In the top-left corner you can use the zoom controls to change the scale of the map.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">In the top-right corner you can click the layer control box to turn off or on the proportional circles representing the total volume of weapons transferred to each country in the selected year.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">At the bottom-right, you can see a legend representing the different color classes used to symbolize the choropleth layer, as well as the sizes of the proportional circles used to express the total volume of weapons transferred. The greatest volume of US weapons transferred for any given year between 2008 and 2018 was 3353 million in SIPRI TIV, transferred to Saudi Arabia in 2018.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">If you hover over a circle with your cursor, you can see nation-level information about the total volume of weapons transferred, the share of all US weapons transferred, and the trend of US weapons transfers to that nation between 2008 and 2018.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="padding-bottom: 0.5em; padding-top: 0.5em">If you click on a nation, you can see information about the percent of total US weapons transferred that went to the nation in the selected year.</p>
+    <hr style="border: 0.5px solid #636363;">
+    <p style="font-size: 12px; padding-top: 0.5em">Choropleth ranges are derived from the application of natural breaks (jenks) to the data representing each nation's share of the total volume of weapons sold between 2008 and 2018. This was modified to remove nations with no purchases from the bottom class.</p>
+    <p style="font-size: 12px;">Explore the raw data: <a class='link' href='https://www.sipri.org/databases/armstransfers'>SIPRI Arms Transfers Database</a></p>
+    <p style="font-size: 12px;">Map authored by Jay Bowen</a>, 2025</p>
+  </div>
+
+  <!-- map legend -->
+  <div id='perc-legend' class='legend'>
+    <div class='grid'>
+      <nav class='col3'>
+        <h3><strong>Share of Total US<br>Weapons Transferred</strong></h3>
+        <div><span style='background-color: #ffffcc'></span>0.01% - 0.15%</div>
+        <div><span style='background-color: #ffeda0'></span>0.16% - 0.54%</div>
+        <div><span style='background-color: #fed976'></span>0.55% - 1.16%</div>
+        <div><span style='background-color: #feb24c'></span>1.17% - 2.23%</div>
+        <div><span style='background-color: #fd8d3c'></span>2.24% - 3.36%</div>
+        <div><span style='background-color: #fc4e2a'></span>3.37% - 4.65%</div>
+        <div><span style='background-color: #e31a1c'></span>4.66% - 8.13%</div>
+        <div><span style='background-color: #b10026'></span>8.14% +</div>
+      </nav>
+      <div class='col9 mx24'>
+        <h3 class='txt-bold mb12 w-full mx-auto'>Total Volume <a class='link' href='https://www.sipri.org/databases/armstransfers/sources-and-methods#TIV-tables'>in SIPRI TIV millions</a><br>of Weapons Transferred</h3>
+        <p class='mb6 mt30'></p>
+        <div class='legend-circles relative w180 wmax180'>
+          <div class="legend-large border absolute" style='color: #d5d106'></div>
+          <div class="legend-small border absolute" style='color: #d5d106'></div>
+          <div class="legend-large-label txt-m absolute"></div>
+          <div class="legend-small-label txt-m absolute"></div>
+        </div>
+      </div>
+    </div>
+    <!-- end grid -->
+  </div>
+  <!-- end perc-legend -->
+
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="text/javascript" src="js/proj4js-compressed.js"></script>
@@ -199,6 +371,7 @@
       // Now that all layers are loaded, initialize the map with the first year value (1950)
       updateMapForYear(1950); // Apply the filter immediately to the initial year (1950)
       createTemporalLegend(1950); // Initialize the temporal legend with 1950
+      drawLegend(volume); // Draw the legend for the volume layer
 
       // Add the filtered layers to the map (filtered by 1950)
       map.addLayer(filteredPercent);
@@ -217,12 +390,12 @@
       L.control.layers(null, overlays, {
         collapsed: false,
       }).addTo(map);
-      
+
     };
 
     // Function to update the map for the selected year
     function updateMapForYear(year) {
-      
+
       // Clear existing layers
       filteredPercent.clearLayers();
       filteredVolume.clearLayers();
@@ -301,17 +474,17 @@
           filteredPercent.addLayer(layer);
         };
       });
-      
+
       // Loop through each layer in the volume layer
       volume.eachLayer(function(layer) {
-        
+
         // Define the properties
         const props = layer.feature.properties;
 
         // Dynamically set the radius of the circle markers based on the volume of weapons transferred
         const radius = calcRadius(Number(props[year]));
         layer.setRadius(radius);
-        
+
         const startYear = props.gwsyear;
         const endYear = props.gweyear;
 
@@ -327,7 +500,7 @@
 
         // On hover, highlight the circle by increasing the opacity
         layer.on('mouseover', function() {
-          
+
           // Clear the TIValues array
           TIValues.length = 0;
 
@@ -345,13 +518,13 @@
             'TIV Volume: ' + props[year] + '<br>' +
             "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
               sticky: true
-          }).openTooltip();  
-          
+            }).openTooltip();
+
           // Loop through a specific feature's properties and push values to the TIValues array
           for (let i = 1950; i <= 2023; i += 1) {
             TIValues.push(props[i]);
           };
-          
+
           // Create sparklines with jQuery and .sparkline() method
           $('.weaponspark').sparkline(TIValues, {
             width: '180px',
@@ -361,7 +534,7 @@
             spotRadius: 0,
             lineWidth: 2,
             normalRangeMin: 0
-          });          
+          });
 
         });
 
@@ -371,7 +544,7 @@
             fillOpacity: 0.25
           });
           // Unbind the tooltip on mouseout to remove it
-          this.unbindTooltip();          
+          this.unbindTooltip();
         });
 
       });
@@ -380,9 +553,15 @@
 
     // Function to handle slider input changes
     $('.slider').on('input', function() {
+      map.dragging.disable(); // Stop map panning     
       const currentYear = Number($(this).val()); // Get the current year from the slider
       updateMapForYear(currentYear); // Call the function to update the map based on the selected year
       createTemporalLegend(currentYear); // Update the temporal legend to match the slider year
+    });
+
+    // On map click, re-enable panning
+    map.on('click', function() {
+      map.dragging.enable();
     });
 
     // Add a temporal legend in sync with the UI slider
@@ -407,7 +586,89 @@
     function calcRadius(val) {
       var radius = Math.sqrt(val / Math.PI);
       return radius * 2; // Adjust 2 as a scale factor
-    }; // End calcRadius() function    
+    }; // End calcRadius() function
+
+    // draw a map legend
+    function drawLegend(volume) {
+
+      const dataValues = []; // create an empty array
+
+      volume.eachLayer(function(layer) { // needs eachLayer() because it is a layer group
+
+        const props = layer.feature.properties;
+
+        // loop through the Leaflet layer group's properties and push values to the empty arrays
+        for (var i = 1950; i <= 2023; i += 1) {
+          dataValues.push(
+            Number(props[i])
+          );
+        }
+      }); // derive the properties of the target layer
+
+      // sort our array
+      const sortedValues = dataValues.sort(function(a, b) {
+        return b - a;
+      });
+
+      // round the highest number and use as our large circle diameter
+      const maxValue = Math.round(sortedValues[0]);
+
+      // calc the diameters
+      const largeDiameter = calcRadius(maxValue) * 2,
+        smallDiameter = largeDiameter / 2;
+
+      // select our circles container and set the height
+      $(".legend-circles").css('height', largeDiameter.toFixed());
+
+      // set width and height for large circle
+      $('.legend-large').css({
+        'width': largeDiameter.toFixed(),
+        'height': largeDiameter.toFixed()
+      });
+
+      // set width and height for small circle and position
+      $('.legend-small').css({
+        'width': smallDiameter.toFixed(),
+        'height': smallDiameter.toFixed(),
+        'top': largeDiameter - smallDiameter,
+        'left': smallDiameter / 2
+      })
+
+      // label the max and median value
+      $(".legend-large-label").html(maxValue);
+      $(".legend-small-label").html(Math.round(maxValue / 2));
+
+      // adjust the position of the large based on size of circle
+      $(".legend-large-label").css({
+        'top': -11,
+        'left': largeDiameter + 20,
+      });
+
+      // adjust the position of the large based on size of circle
+      $(".legend-small-label").css({
+        'top': smallDiameter - 11,
+        'left': largeDiameter + 20
+      });
+
+      // insert a couple hr elements and use to connect value label to top of each circle
+      $("<hr class='large'>").insertBefore(".legend-large-label")
+      $("<hr class='small'>").insertBefore(".legend-small-label").css('top', largeDiameter - smallDiameter - 9);
+
+    }; // end drawLegend() function
+
+    // Add a function to toggle the legend on and off
+    showLegend = true; // default value showing the legend
+
+    const toggleLegend = function() {
+      if (showLegend === true) {
+        /* use jquery to select your DOM elements that has the class 'legend' */
+        $('.legend').hide();
+        showLegend = false;
+      } else {
+        $('.legend').show();
+        showLegend = true;
+      }
+    };
   </script>
 </body>
 
