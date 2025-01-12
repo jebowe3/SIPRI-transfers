@@ -431,7 +431,7 @@
 
           // Add a tooltip with the nation's name and the sparkline placeholder
           this.bindTooltip(
-            props.cntry_name + ' (' + year + ')<br>' +
+            '<b>' + props.cntry_name + '</b>' + ' (' + year + ')<br>' +
             props[year] + '% of US Weapons Exported<br>' +
             "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
               sticky: true
@@ -514,7 +514,7 @@
 
           // Add a tooltip with the nation's name and the sparkline placeholder
           this.bindTooltip(
-            props.cntry_name + ' (' + year + ')<br>' +
+            '<b>' + props.cntry_name + '</b>' + ' (' + year + ')<br>' +
             'TIV Volume: ' + props[year] + '<br>' +
             "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
               sticky: true
