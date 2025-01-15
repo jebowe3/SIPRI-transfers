@@ -270,7 +270,8 @@
   <script type="text/javascript" src="js/L.Graticule.js"></script>
   <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
   <script src="https://d3js.org/d3.v4.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>
+  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>-->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script><!-- Use Chart.js with WebGL for improved performance -->
 
   <script type="text/javascript">
     // Sphere Mollweide: http://spatialreference.org/ref/esri/53009/
@@ -393,26 +394,21 @@
 
     // Function to update the map for the selected year
     function updateMapForYear(year, percent, volume) {
-
       // Loop through each layer in the percent layer
       percent.eachLayer(function(layer) {
+        // Create an empty array
+        const TIValues = [];
+
         // Define the properties
         const props = layer.feature.properties; // derive the properties of the target layer
 
         // Dynamically set styles for all nations based on percentage of US weapons
-        // received in the slider designated year using the getColor function
         layer.setStyle({
           fillColor: getColor(props[year])
         });
 
-        // Create an empty array
-        const TIValues = [];
-
         // On hover, highlight the nation with a yellow border
         layer.on('mouseover', function() {
-          // Clear the TIValues array
-          TIValues.length = 0;
-
           // Set the mouseover style
           this.setStyle({
             weight: 2,
@@ -423,29 +419,69 @@
           // Remove any existing tooltip to avoid duplications
           this.unbindTooltip();
 
-          // Add a tooltip with the nation's name and the sparkline placeholder
-          this.bindTooltip(
-            '<b>' + props.cntry_name + '</b>' + ' (' + year + ')<br>' +
-            props[year] + '% of US Weapons Exported<br>' +
-            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
-              sticky: true
-            }).openTooltip();
+          // Create a canvas element dynamically for sparklines
+          const canvas = document.createElement('canvas');
+          canvas.width = 180;
+          canvas.height = 40;
 
-          // Loop through a specific feature's properties and push values to the TIValues array
-          for (let i = 1950; i <= 2023; i += 1) {
+          // Get the canvas context
+          const ctx = canvas.getContext('2d');
+
+          // Prepare the data for sparklines (1950 to 2023)
+          for (let i = 1950; i <= 2023; i++) {
             TIValues.push(props[i]);
           }
 
-          // Create sparklines with jQuery and .sparkline() method
-          $('.weaponspark').sparkline(TIValues, {
-            width: '180px',
-            height: '40px',
-            lineColor: '#67271d',
-            fillColor: '#67271d',
-            spotRadius: 0,
-            lineWidth: 2,
-            normalRangeMin: 0
+          // Render the sparkline using Chart.js
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: Array.from({
+                length: 2023 - 1950 + 1
+              }, (_, i) => 1950 + i),
+              datasets: [{
+                data: TIValues,
+                borderColor: '#67271d',
+                backgroundColor: 'rgba(103, 39, 29, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                pointRadius: 0
+              }]
+            },
+            options: {
+              responsive: false,
+              maintainAspectRatio: false,
+              scales: {
+                x: {
+                  display: false
+                },
+                y: {
+                  display: false
+                }
+              },
+              plugins: {
+                tooltip: {
+                  enabled: false
+                }, // Disable Chart.js tooltip
+                legend: {
+                  display: false
+                }
+              }
+            }
           });
+
+          // Add a tooltip with the nation's name and the generated canvas sparkline
+          this.bindTooltip(
+            `<b>${props.cntry_name}</b> (${year})<br>
+                 ${props[year]}% of US Weapons Exported<br>
+                 National Trend: 1950 - 2023<br>`, {
+              sticky: true
+            }
+          ).openTooltip();
+
+          // Append the canvas to the tooltip content
+          const tooltipContent = this._tooltip._contentNode;
+          tooltipContent.appendChild(canvas);
         });
 
         // On mouseout, reset the style
@@ -465,21 +501,20 @@
 
         // Check the year range and add countries to the filtered layer
         if (startYear <= year && endYear >= year) {
-          // Set the fillOpacity to 0.5
           layer.setStyle({
             fillOpacity: 0.5
           });
         } else {
-          // Set the fillOpacity to 0
           layer.setStyle({
             fillOpacity: 0
           });
-        };
-
+        }
       });
 
       // Loop through each layer in the volume layer
       volume.eachLayer(function(layer) {
+        // Create an empty array
+        const TIValues = [];
 
         // Define the properties
         const props = layer.feature.properties;
@@ -509,23 +544,15 @@
             });
           }
         } else {
-          // Set the opacity to 0 and the fillOpacity to 0
           layer.setStyle({
             weight: 0,
             opacity: 0,
             fillOpacity: 0
           });
-        };
-
-        // Create an empty array
-        const TIValues = [];
+        }
 
         // On hover, highlight the circle by increasing the opacity
         layer.on('mouseover', function() {
-
-          // Clear the TIValues array
-          TIValues.length = 0;
-
           // Set the mouseover style
           this.setStyle({
             fillOpacity: 0.7
@@ -534,30 +561,69 @@
           // Remove any existing tooltip to avoid duplications
           this.unbindTooltip();
 
-          // Add a tooltip with the nation's name and the sparkline placeholder
-          this.bindTooltip(
-            '<b>' + props.cntry_name + '</b>' + ' (' + year + ')<br>' +
-            'TIV Volume: ' + props[year] + '<br>' +
-            "National Trend:<br>1950 - 2023<br><span class='weaponspark'></span>", {
-              sticky: true
-            }).openTooltip();
+          // Create a canvas element dynamically for sparklines
+          const canvas = document.createElement('canvas');
+          canvas.width = 180;
+          canvas.height = 40;
 
-          // Loop through a specific feature's properties and push values to the TIValues array
-          for (let i = 1950; i <= 2023; i += 1) {
+          // Get the canvas context
+          const ctx = canvas.getContext('2d');
+
+          // Prepare the data for sparklines (1950 to 2023)
+          for (let i = 1950; i <= 2023; i++) {
             TIValues.push(props[i]);
-          };
+          }
 
-          // Create sparklines with jQuery and .sparkline() method
-          $('.weaponspark').sparkline(TIValues, {
-            width: '180px',
-            height: '40px',
-            lineColor: '#67271d',
-            fillColor: '#67271d',
-            spotRadius: 0,
-            lineWidth: 2,
-            normalRangeMin: 0
+          // Render the sparkline using Chart.js
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: Array.from({
+                length: 2023 - 1950 + 1
+              }, (_, i) => 1950 + i),
+              datasets: [{
+                data: TIValues,
+                borderColor: '#67271d',
+                backgroundColor: 'rgba(103, 39, 29, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                pointRadius: 0
+              }]
+            },
+            options: {
+              responsive: false,
+              maintainAspectRatio: false,
+              scales: {
+                x: {
+                  display: false
+                },
+                y: {
+                  display: false
+                }
+              },
+              plugins: {
+                tooltip: {
+                  enabled: false
+                },
+                legend: {
+                  display: false
+                }
+              }
+            }
           });
 
+          // Add a tooltip with the nation's name and the generated canvas sparkline
+          this.bindTooltip(
+            `<b>${props.cntry_name}</b> (${year})<br>
+                 TIV Volume: ${props[year]}<br>
+                 National Trend: 1950 - 2023<br>`, {
+              sticky: true
+            }
+          ).openTooltip();
+
+          // Append the canvas to the tooltip content
+          const tooltipContent = this._tooltip._contentNode;
+          tooltipContent.appendChild(canvas);
         });
 
         // On mouseout, reset the style
@@ -568,9 +634,7 @@
           // Unbind the tooltip on mouseout to remove it
           this.unbindTooltip();
         });
-
       });
-
     };
 
     // Add a temporal legend in sync with the UI slider
