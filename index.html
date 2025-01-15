@@ -310,12 +310,7 @@
     // Create a feature group to store points
     const filteredVolume = L.featureGroup();
 
-    // Declare a global variable to store the percent layer
-    let percent;
-
-    // Declare a global variable to store the volume layer
-    let volume;
-
+    // PROBABLY NEED TO CONVERT TO VECTOR TILES
     // Load the data and initialize the map
     d3.queue()
       .defer(d3.json, 'data/clipped-world-land.geojson') // the continents, land masses
@@ -342,7 +337,7 @@
       }).addTo(map); // Keeps the earth layer from being placed over the circle markers upon map load
 
       // Create the percent layer but don't add it directly to the map
-      percent = L.geoJson(perc, {
+      const percent = L.geoJson(perc, {
         style: function(feature) {
           return {
             stroke: 0.5,
@@ -355,7 +350,7 @@
       });
 
       // Create the volume point layer but don't add it directly to the map
-      volume = L.geoJson(vol, {
+      const volume = L.geoJson(vol, {
         pointToLayer: function(feature, latlng) {
           return L.circleMarker(latlng, {
             //radius: 5,
@@ -369,7 +364,7 @@
       });
 
       // Now that all layers are loaded, initialize the map with the first year value (1950)
-      updateMapForYear(1950); // Apply the filter immediately to the initial year (1950)
+      updateMapForYear(1950, percent, volume); // Apply the filter immediately to the initial year (1950)
       createTemporalLegend(1950); // Initialize the temporal legend with 1950
       drawLegend(volume); // Draw the legend for the volume layer
 
@@ -391,10 +386,23 @@
         collapsed: false,
       }).addTo(map);
 
+      // Function to handle slider input changes
+      $('.slider').on('input', function() {
+        map.dragging.disable(); // Stop map panning     
+        const currentYear = Number($(this).val()); // Get the current year from the slider
+        updateMapForYear(currentYear, percent, volume); // Call the function to update the map based on the selected year
+        createTemporalLegend(currentYear); // Update the temporal legend to match the slider year
+      });
+
+      // On map click, re-enable panning
+      map.on('click', function() {
+        map.dragging.enable();
+      });
+
     };
 
     // Function to update the map for the selected year
-    function updateMapForYear(year) {
+    function updateMapForYear(year, percent, volume) {
 
       // Clear existing layers
       filteredPercent.clearLayers();
@@ -550,19 +558,6 @@
       });
 
     };
-
-    // Function to handle slider input changes
-    $('.slider').on('input', function() {
-      map.dragging.disable(); // Stop map panning     
-      const currentYear = Number($(this).val()); // Get the current year from the slider
-      updateMapForYear(currentYear); // Call the function to update the map based on the selected year
-      createTemporalLegend(currentYear); // Update the temporal legend to match the slider year
-    });
-
-    // On map click, re-enable panning
-    map.on('click', function() {
-      map.dragging.enable();
-    });
 
     // Add a temporal legend in sync with the UI slider
     function createTemporalLegend(currentYear) {
