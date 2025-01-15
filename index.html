@@ -304,12 +304,6 @@
       }
     }).addTo(map);
 
-    // Create a feature group to store polygons
-    const filteredPercent = L.featureGroup();
-
-    // Create a feature group to store points
-    const filteredVolume = L.featureGroup();
-
     // PROBABLY NEED TO CONVERT TO VECTOR TILES
     // Load the data and initialize the map
     d3.queue()
@@ -347,7 +341,7 @@
             fillOpacity: 0.5
           };
         }
-      });
+      }).addTo(map);
 
       // Create the volume point layer but don't add it directly to the map
       const volume = L.geoJson(vol, {
@@ -361,24 +355,20 @@
             fillOpacity: 0.25
           });
         }
-      });
+      }).addTo(map);
 
       // Now that all layers are loaded, initialize the map with the first year value (1950)
       updateMapForYear(1950, percent, volume); // Apply the filter immediately to the initial year (1950)
       createTemporalLegend(1950); // Initialize the temporal legend with 1950
       drawLegend(volume); // Draw the legend for the volume layer
 
-      // Add the filtered layers to the map (filtered by 1950)
-      map.addLayer(filteredPercent);
-      map.addLayer(filteredVolume);
-
       // Fit the map to the world
       map.fitWorld();
 
       // Define the overlays
       const overlays = {
-        "Total Volume of Weapons": filteredVolume,
-        "Percentage of Weapons": filteredPercent
+        "Percentage of Weapons": percent,
+        "Total Volume of Weapons": volume,
       };
 
       // all done with the layers, add them to layer control
@@ -403,10 +393,6 @@
 
     // Function to update the map for the selected year
     function updateMapForYear(year, percent, volume) {
-
-      // Clear existing layers
-      filteredPercent.clearLayers();
-      filteredVolume.clearLayers();
 
       // Loop through each layer in the percent layer
       percent.eachLayer(function(layer) {
@@ -479,8 +465,17 @@
 
         // Check the year range and add countries to the filtered layer
         if (startYear <= year && endYear >= year) {
-          filteredPercent.addLayer(layer);
+          // Set the fillOpacity to 0.5
+          layer.setStyle({
+            fillOpacity: 0.5
+          });
+        } else {
+          // Set the fillOpacity to 0
+          layer.setStyle({
+            fillOpacity: 0
+          });
         };
+
       });
 
       // Loop through each layer in the volume layer
@@ -499,8 +494,27 @@
         // Check the year range and add countries to the filtered layer
         if (startYear <= year && endYear >= year) {
           if (props[year] > 0) {
-            filteredVolume.addLayer(layer);
+            // Set the opacity to 1 and the fillOpacity to 0.25
+            layer.setStyle({
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.25
+            });
+          } else {
+            // Set the opacity to 0 and the fillOpacity to 0
+            layer.setStyle({
+              weight: 0,
+              opacity: 0,
+              fillOpacity: 0
+            });
           }
+        } else {
+          // Set the opacity to 0 and the fillOpacity to 0
+          layer.setStyle({
+            weight: 0,
+            opacity: 0,
+            fillOpacity: 0
+          });
         };
 
         // Create an empty array
