@@ -308,8 +308,8 @@
     // PROBABLY NEED TO CONVERT TO VECTOR TILES
     // Load the data and initialize the map
     d3.queue()
-      .defer(d3.json, 'data/clipped-world-land.geojson') // the continents, land masses
-      .defer(d3.json, 'data/sipri-perc.geojson') // the percentage layer
+      .defer(d3.json, 'data/clipped-world-land.json') // the continents, land masses
+      .defer(d3.json, 'data/sipri-perc.json') // the percentage layer
       .defer(d3.json, 'data/sipri-vol.geojson') // the volume layer
       .await(drawMap); // load the layers after the map loads
 
