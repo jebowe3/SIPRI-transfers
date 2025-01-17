@@ -305,7 +305,10 @@
       }
     }).addTo(map);
 
-    // PROBABLY NEED TO CONVERT TO VECTOR TILES
+    // Create an empty layer group to store filtered layers
+    const filteredPerc = L.layerGroup().addTo(map);
+    const filteredVol = L.layerGroup().addTo(map);
+
     // Load the data and initialize the map
     d3.queue()
       .defer(d3.json, 'data/clipped-world-land.json') // the continents, land masses
@@ -314,8 +317,12 @@
       .await(drawMap); // load the layers after the map loads
 
     function drawMap(err, land, perc, vol) {
+
       // Reset the slider to the initial year
       $('.slider').val(1950);
+
+      // Set year to the slider value
+      let year = Number($('.slider').val());
 
       // Create the earth layer (background layer for land masses)
       const earth = L.geoJson(land, {
@@ -331,24 +338,26 @@
         }
       }).addTo(map); // Keeps the earth layer from being placed over the circle markers upon map load
 
-      // Create the percent layer but don't add it directly to the map
+      // Create the percent layer
       const percent = L.geoJson(perc, {
         style: function(feature) {
+          let props = feature.properties;
           return {
             stroke: 0.5,
             color: 'grey',
-            strokeOpacity: 0.0,
+            strokeOpacity: 0.5,
             weight: 0.5,
-            fillOpacity: 0.5
+            fillOpacity: 0.5,
+            fillColor: getColor(props[year])
           };
         }
-      }).addTo(map);
+      });
 
-      // Create the volume point layer but don't add it directly to the map
+      // Create the volume layer
       const volume = L.geoJson(vol, {
         pointToLayer: function(feature, latlng) {
           return L.circleMarker(latlng, {
-            //radius: 5,
+            radius: calcRadius(Number(feature.properties[year])),
             fillColor: 'orange',
             color: 'orange',
             weight: 1,
@@ -356,82 +365,121 @@
             fillOpacity: 0.25
           });
         }
-      }).addTo(map);
-
-      // Now that all layers are loaded, initialize the map with the first year value (1950)
-      updateMapForYear(1950, percent, volume); // Apply the filter immediately to the initial year (1950)
-      createTemporalLegend(1950); // Initialize the temporal legend with 1950
-      drawLegend(volume); // Draw the legend for the volume layer
+      });
 
       // Fit the map to the world
       map.fitWorld();
 
-      // Define the overlays
-      const overlays = {
-        "Percentage of Weapons": percent,
-        "Total Volume of Weapons": volume,
-      };
+      createTemporalLegend(1950); // Initialize the temporal legend with 1950
 
-      // all done with the layers, add them to layer control
-      L.control.layers(null, overlays, {
-        collapsed: false,
-      }).addTo(map);
+      updateLayers(year, percent, volume); // Update the layers to match the initial year
+
+      drawLegend(volume); // Draw the map legend
 
       // Function to handle slider input changes
       $('.slider').on('input', function() {
-        map.dragging.disable(); // Stop map panning     
         const currentYear = Number($(this).val()); // Get the current year from the slider
-        updateMapForYear(currentYear, percent, volume); // Call the function to update the map based on the selected year
         createTemporalLegend(currentYear); // Update the temporal legend to match the slider year
+        updateLayers(currentYear, percent, volume); // Update the layers to match the slider year
       });
 
-      // On map click, re-enable panning
-      map.on('click', function() {
-        map.dragging.enable();
+      // Disable map dragging when the mouse enters the .slider element
+      $('.slider').on('mouseenter', function() {
+        map.dragging.disable(); // Disable dragging
       });
+
+      // Re-enable map dragging when the mouse leaves the .slider element
+      $('.slider').on('mouseleave', function() {
+        map.dragging.enable(); // Re-enable dragging
+      });
+
+      // Define the layers
+      const layers = {
+        "Percentage of Weapons": filteredPerc,
+        "Total Volume of Weapons": filteredVol,
+      };
+      // All done with the layers, add them to layer control
+      const layerControl = L.control.layers(null, layers, {
+        collapsed: false,
+      }).addTo(map);
 
     };
 
-    // Function to update the map for the selected year
-    function updateMapForYear(year, percent, volume) {
-      // Loop through each layer in the percent layer
-      percent.eachLayer(function(layer) {
+    // Add a temporal legend in sync with the UI slider
+    function createTemporalLegend(currentYear) {
+      $('#temporal span').html(currentYear); // Change grade value to that currently selected by UI slider
+    };
+
+    // Add a function to style the nations by their percentage share of weapons
+    function getColor(d) {
+      return d > 8.13 ? '#b10026' :
+        d > 4.65 ? '#e31a1c' :
+        d > 3.36 ? '#fc4e2a' :
+        d > 2.23 ? '#fd8d3c' :
+        d > 1.16 ? '#feb24c' :
+        d > 0.54 ? '#fed976' :
+        d > 0.15 ? '#ffeda0' :
+        d > 0.009 ? '#ffffcc' :
+        '#000000';
+    };
+
+    // Calculate circle radii
+    function calcRadius(val) {
+      var radius = Math.sqrt(val / Math.PI);
+      return radius * 2; // Adjust 2 as a scale factor
+    }; // End calcRadius() function
+
+    // Update the layers based on the year selected by the slider
+    function updateLayers(year, perc, vol) {
+      // Clear the filteredPerc and filteredVol layers
+      filteredPerc.clearLayers();
+      filteredVol.clearLayers();
+      // Loop through the features in the perc layer
+      perc.eachLayer(function(layer) {
         // Create an empty array
         const TIValues = [];
-
         // Define the properties
-        const props = layer.feature.properties; // derive the properties of the target layer
-
-        // Dynamically set styles for all nations based on percentage of US weapons
+        const props = layer.feature.properties;
+        // Define the start and end years
+        const startYear = props.gwsyear;
+        const endYear = props.gweyear;
+        // Set the initial style
         layer.setStyle({
-          fillColor: getColor(props[year])
+          fillColor: getColor(props[year]),
+          stroke: 0.5,
+          color: 'grey',
+          strokeOpacity: 0.5,
+          weight: 0.5,
+          fillOpacity: 0.5
         });
-
         // On hover, highlight the nation with a yellow border
         layer.on('mouseover', function() {
           // Set the mouseover style
-          this.setStyle({
+          layer.setStyle({
+            stroke: 0.5,
+            strokeOpacity: 0.5,
             weight: 2,
             color: 'yellow',
             fillOpacity: 0.7
           });
-
-          // Remove any existing tooltip to avoid duplications
-          this.unbindTooltip();
-
-          // Create a canvas element dynamically for sparklines
+          // Remove any existing popup to avoid duplications
+          layer.unbindPopup();
+          // Create a canvas element dynamically for sparklines (only if it doesn't exist already)
           const canvas = document.createElement('canvas');
           canvas.width = 180;
           canvas.height = 40;
-
+          // Check if the canvas already exists in the popup content
+          const existingCanvas = layer._popup ? layer._popup.getElement().querySelector('canvas') : null;
+          if (existingCanvas) {
+            // If a canvas already exists, don't create a new one
+            return;
+          }
           // Get the canvas context
           const ctx = canvas.getContext('2d');
-
           // Prepare the data for sparklines (1950 to 2023)
           for (let i = 1950; i <= 2023; i++) {
             TIValues.push(props[i]);
           }
-
           // Render the sparkline using Chart.js
           new Chart(ctx, {
             type: 'line',
@@ -469,111 +517,109 @@
               }
             }
           });
-
-          // Add a tooltip with the nation's name and the generated canvas sparkline
-          this.bindTooltip(
-            `<b>${props.cntry_name}</b> (${year})<br>
-                 ${props[year]}% of US Weapons Exported<br>
-                 National Trend: 1950 - 2023<br>`, {
-              sticky: true
+          // Create a custom popup content with the generated canvas and other information
+          const popupContent = `
+              <b>${props.cntry_name}</b> (${year})<br>
+              ${props[year]}% of US Weapons Exported<br>
+              National Trend: 1950 - 2023<br>
+            `;
+          // Bind the popup with the content (without opening it immediately)
+          layer.bindPopup(popupContent);
+          // Now, attach the popupopen event to append the canvas after popup is opened
+          layer.on('popupopen', function() {
+            const popupElement = this._popup.getElement();
+            if (popupElement) {
+              const popupContentNode = popupElement.querySelector('.leaflet-popup-content');
+              if (popupContentNode && !popupContentNode.querySelector('canvas')) {
+                // Append the canvas if it doesn't already exist
+                popupContentNode.appendChild(canvas);
+              }
             }
-          ).openTooltip();
-
-          // Append the canvas to the tooltip content
-          const tooltipContent = this._tooltip._contentNode;
-          tooltipContent.appendChild(canvas);
+          });
         });
-
         // On mouseout, reset the style
         layer.on('mouseout', function() {
-          this.setStyle({
-            weight: 0.5,
+          layer.setStyle({
+            stroke: 0.5,
             color: 'grey',
+            strokeOpacity: 0.5,
+            weight: 0.5,
             fillOpacity: 0.5
           });
-
-          // Unbind the tooltip on mouseout to remove it
-          this.unbindTooltip();
+          // Unbind the popup on mouseout to remove it
+          layer.unbindPopup();
         });
-
-        const startYear = props.gwsyear;
-        const endYear = props.gweyear;
-
-        // Check the year range and add countries to the filtered layer
-        if (startYear <= year && endYear >= year) {
-          layer.setStyle({
-            fillOpacity: 0.5
-          });
+        // If the year is within the range, add the layer to the filteredPerc group
+        if (startYear <= year && year <= endYear) {
+          filteredPerc.addLayer(layer);
         } else {
-          layer.setStyle({
-            fillOpacity: 0
-          });
+          // Otherwise, remove the layer from the map
+          filteredPerc.removeLayer(layer);
         }
       });
-
-      // Loop through each layer in the volume layer
-      volume.eachLayer(function(layer) {
+      // Loop through the features in the vol layer
+      vol.eachLayer(function(layer) {
         // Create an empty array
         const TIValues = [];
-
         // Define the properties
         const props = layer.feature.properties;
-
-        // Dynamically set the radius of the circle markers based on the volume of weapons transferred
-        const radius = calcRadius(Number(props[year]));
-        layer.setRadius(radius);
-
+        // Define the start and end years
         const startYear = props.gwsyear;
         const endYear = props.gweyear;
-
-        // Check the year range and add countries to the filtered layer
-        if (startYear <= year && endYear >= year) {
-          if (props[year] > 0) {
-            // Set the opacity to 1 and the fillOpacity to 0.25
-            layer.setStyle({
-              weight: 1,
-              opacity: 1,
-              fillOpacity: 0.25
-            });
-          } else {
-            // Set the opacity to 0 and the fillOpacity to 0
-            layer.setStyle({
-              weight: 0,
-              opacity: 0,
-              fillOpacity: 0
-            });
-          }
-        } else {
+        // Show
+        if (props[year] != 0) {
           layer.setStyle({
+            radius: calcRadius(Number(props[year])),
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.25
+          });
+        } else {
+          // Hide
+          layer.setStyle({
+            radius: 0,
             weight: 0,
             opacity: 0,
             fillOpacity: 0
           });
         }
-
         // On hover, highlight the circle by increasing the opacity
         layer.on('mouseover', function() {
-          // Set the mouseover style
-          this.setStyle({
-            fillOpacity: 0.7
-          });
-
-          // Remove any existing tooltip to avoid duplications
-          this.unbindTooltip();
-
-          // Create a canvas element dynamically for sparklines
+          // Show
+          if (props[year] != 0) {
+            this.setStyle({
+              radius: calcRadius(Number(props[year])),
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.7
+            });
+          } else {
+            // Hide
+            layer.setStyle({
+              radius: 0,
+              weight: 0,
+              opacity: 0,
+              fillOpacity: 0
+            });
+          }
+          // Remove any existing popup to avoid duplications
+          this.unbindPopup();
+          // Create a canvas element dynamically for sparklines (only if it doesn't exist already)
           const canvas = document.createElement('canvas');
           canvas.width = 180;
           canvas.height = 40;
-
+          // Check if the canvas already exists in the popup content
+          const existingCanvas = this._popup ? this._popup.getElement().querySelector('canvas') : null;
+          if (existingCanvas) {
+            // If a canvas already exists, don't create a new one
+            return;
+          }
           // Get the canvas context
           const ctx = canvas.getContext('2d');
-
           // Prepare the data for sparklines (1950 to 2023)
           for (let i = 1950; i <= 2023; i++) {
             TIValues.push(props[i]);
           }
-
           // Render the sparkline using Chart.js
           new Chart(ctx, {
             type: 'line',
@@ -611,55 +657,57 @@
               }
             }
           });
-
-          // Add a tooltip with the nation's name and the generated canvas sparkline
-          this.bindTooltip(
-            `<b>${props.cntry_name}</b> (${year})<br>
-                 TIV Volume: ${props[year]}<br>
-                 National Trend: 1950 - 2023<br>`, {
-              sticky: true
+          // Create a custom popup content with the generated canvas and other information
+          const popupContent = `
+              <b>${props.cntry_name}</b> (${year})<br>
+              TIV Volume: ${props[year]}<br>
+              National Trend: 1950 - 2023<br>
+            `;
+          // Bind the popup with the content (without opening it immediately)
+          this.bindPopup(popupContent);
+          // Now, attach the popupopen event to append the canvas after popup is opened
+          this.on('popupopen', function() {
+            const popupElement = this._popup.getElement();
+            if (popupElement) {
+              const popupContentNode = popupElement.querySelector('.leaflet-popup-content');
+              if (popupContentNode && !popupContentNode.querySelector('canvas')) {
+                // Append the canvas if it doesn't already exist
+                popupContentNode.appendChild(canvas);
+              }
             }
-          ).openTooltip();
-
-          // Append the canvas to the tooltip content
-          const tooltipContent = this._tooltip._contentNode;
-          tooltipContent.appendChild(canvas);
+          });
         });
-
         // On mouseout, reset the style
         layer.on('mouseout', function() {
-          this.setStyle({
-            fillOpacity: 0.25
-          });
-          // Unbind the tooltip on mouseout to remove it
-          this.unbindTooltip();
+          // Show
+          if (props[year] != 0) {
+            this.setStyle({
+              radius: calcRadius(Number(props[year])),
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.25
+            });
+          } else {
+            // Hide
+            layer.setStyle({
+              radius: 0,
+              weight: 0,
+              opacity: 0,
+              fillOpacity: 0
+            });
+          }
+          // Unbind the popup on mouseout to remove it
+          this.unbindPopup();
         });
+        // If the year is within the range, add the layer to the filteredVol group
+        if (startYear <= year && year <= endYear) {
+          filteredVol.addLayer(layer);
+        } else {
+          // Otherwise, remove the layer from the map
+          filteredVol.removeLayer(layer);
+        }
       });
     };
-
-    // Add a temporal legend in sync with the UI slider
-    function createTemporalLegend(currentYear) {
-      $('#temporal span').html(currentYear); // Change grade value to that currently selected by UI slider
-    };
-
-    // Add a function to style the nations by their percentage share of weapons
-    function getColor(d) {
-      return d > 8.13 ? '#b10026' :
-        d > 4.65 ? '#e31a1c' :
-        d > 3.36 ? '#fc4e2a' :
-        d > 2.23 ? '#fd8d3c' :
-        d > 1.16 ? '#feb24c' :
-        d > 0.54 ? '#fed976' :
-        d > 0.15 ? '#ffeda0' :
-        d > 0.009 ? '#ffffcc' :
-        '#000000';
-    };
-
-    // Calculate circle radii
-    function calcRadius(val) {
-      var radius = Math.sqrt(val / Math.PI);
-      return radius * 2; // Adjust 2 as a scale factor
-    }; // End calcRadius() function
 
     // draw a map legend
     function drawLegend(volume) {
